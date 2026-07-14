@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
+import { API_BASE_URL as BASE_URL } from "../../config";
 import "../../styles/StudentProfile.css";
 
 // --- Icons ---
@@ -24,8 +25,8 @@ const SECTIONS = ["A", "B", "C", "D"];
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 const ADMISSION_MODES = ["Regular", "Lateral"];
 
-const API_BASE_URL = "https://cas-cams-hostel-management-1.onrender.com/api/student";
-const ALLOCATION_API_URL = "https://cas-cams-hostel-management-1.onrender.com/api/allocation";
+const API_BASE_URL = `${BASE_URL}/api/student`;
+const ALLOCATION_API_URL = `${BASE_URL}/api/allocation`;
 
 export default function StudentProfile() {
   const { user, loading } = useAuth();

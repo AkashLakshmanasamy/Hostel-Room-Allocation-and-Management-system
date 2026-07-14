@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
+import { API_BASE_URL } from "../../config";
 import "../../styles/AdminStyles.css";
 
-const API_BASE = "https://cas-cams-hostel-management-1.onrender.com/api/menu";
+const API_BASE = `${API_BASE_URL}/api/menu`;
 
 export default function AdminMenuUpdate() {
   const [selectedDay, setSelectedDay] = useState("Monday");

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext"; 
+import { API_BASE_URL as BASE_URL } from "../../config";
 import "../../styles/LeaveApplication.css";
 
 // --- Icons (Same as before) ---
@@ -20,7 +21,7 @@ const ICONS = {
   print: "M7.25 10.25a.75.75 0 00-1.5 0v6.5a.75.75 0 00.75.75h7a.75.75 0 00.75-.75v-6.5a.75.75 0 00-1.5 0v5h-5.5v-5zM6 6.75A.75.75 0 016.75 6h6.5a.75.75 0 01.75.75v3.5a.75.75 0 01-.75.75h-6.5A.75.75 0 016 10.25v-3.5z"
 };
 
-const API_BASE_URL = "https://cas-cams-hostel-management-1.onrender.com/api/leave";
+const API_BASE_URL = `${BASE_URL}/api/leave`;
 
 export default function LeaveApplication() {
   const { user } = useAuth();

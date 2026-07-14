@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext"; 
+import { API_BASE_URL } from "../../config";
 import "../../styles/Auth.css";
 
 export default function Signup() {
@@ -20,7 +21,7 @@ export default function Signup() {
     setLoading(true);
 
     try {
-      const response = await fetch("https://cas-cams-hostel-management-1.onrender.com/api/auth/signup", {
+      const response = await fetch(`${API_BASE_URL}/api/auth/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password, role: role }), 

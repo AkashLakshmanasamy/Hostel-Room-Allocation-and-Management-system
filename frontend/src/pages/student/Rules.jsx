@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { API_BASE_URL } from "../../config";
 import "../../styles/Rules.css";
 
 export default function Rules() {
@@ -6,7 +7,7 @@ export default function Rules() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("https://cas-cams-hostel-management-1.onrender.com/api/rules")
+    fetch(`${API_BASE_URL}/api/rules`)
       .then(res => res.json())
       .then(res => {
         setData({

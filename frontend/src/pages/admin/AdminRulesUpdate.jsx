@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { API_BASE_URL } from "../../config";
 import "../../styles/AdminStyles.css";
 
 export default function AdminRulesUpdate() {
@@ -15,7 +16,7 @@ export default function AdminRulesUpdate() {
 
   const fetchRules = async () => {
     try {
-      const res = await fetch("https://cas-cams-hostel-management-1.onrender.com/api/rules");
+      const res = await fetch(`${API_BASE_URL}/api/rules`);
       const data = await res.json();
       if (data) {
         setRules({
@@ -31,7 +32,7 @@ export default function AdminRulesUpdate() {
   const handleSave = async () => {
     setMessage("⏳ Saving changes...");
     try {
-      const res = await fetch("https://cas-cams-hostel-management-1.onrender.com/api/rules", {
+      const res = await fetch(`${API_BASE_URL}/api/rules`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(rules)

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { API_BASE_URL } from "../../config";
 import "../../styles/Feedback.css"; // ✅ Your CSS file
 
 // --- Icons ---
@@ -45,7 +46,7 @@ export default function Feedback() {
     setError(null);
 
     try {
-      const res = await fetch("https://cas-cams-hostel-management-1.onrender.com/api/feedback", {
+      const res = await fetch(`${API_BASE_URL}/api/feedback`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
