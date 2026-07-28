@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: kongu-hostel-backend
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && npm start
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: PORT
+        value: 10000
+      - key: FRONTEND_URL
+        sync: false

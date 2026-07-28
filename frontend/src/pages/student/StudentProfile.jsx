@@ -3,7 +3,6 @@ import { useAuth } from "../../context/AuthContext";
 import { API_BASE_URL as BASE_URL } from "../../config";
 import "../../styles/StudentProfile.css";
 
-// --- Icons ---
 const Icon = ({ path, className = "" }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={`icon ${className}`}>
     <path fillRule="evenodd" d={path} clipRule="evenodd" />
@@ -73,8 +72,16 @@ export default function StudentProfile() {
           setForm(prev => ({
             ...prev,
             ...profileData,
-            roomNo: profileData.room_no || "",
             rollNo: profileData.roll_no || "",
+            bloodGroup: profileData.blood_group || "",
+            admissionMode: profileData.admission_mode || "",
+            fatherName: profileData.father_name || "",
+            fatherContact: profileData.father_contact || "",
+            fatherOccupation: profileData.father_occupation || "",
+            motherName: profileData.mother_name || "",
+            motherContact: profileData.mother_contact || "",
+            motherOccupation: profileData.mother_occupation || "",
+            roomNo: profileData.room_no || "",
             feeMode: profileData.fee_mode || "",
             email: user.email,
           }));
@@ -95,7 +102,7 @@ export default function StudentProfile() {
         }
 
       } catch (err) {
-        console.error("Fetch Error:", err.message);
+        console.error(err.message);
       }
     };
     fetchAllData();
@@ -103,7 +110,14 @@ export default function StudentProfile() {
 
   const onChange = (e) => {
     const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
+    setForm(prev => {
+      const updated = { ...prev, [name]: value };
+      if (name === "feeMode" && value === "Unpaid") {
+        setFeesReceipt(null);
+        setFeesPreview("");
+      }
+      return updated;
+    });
     if (errors[name]) setErrors(prev => ({ ...prev, [name]: "" }));
   };
 
@@ -125,7 +139,10 @@ export default function StudentProfile() {
       "admissionMode"
     ];
     requiredFields.forEach(f => { if (!form[f]?.toString().trim()) newErrors[f] = "Required"; });
-    if (!passportPhoto && !passportPreview) newErrors.passportPhoto = "Required";
+    if (!passportPhoto && !passportPreview) newErrors.passportPhoto = "Passport photo is required";
+    if (form.feeMode === "Paid" && !feesReceipt && !feesPreview) {
+      newErrors.feesReceipt = "Fees receipt is required";
+    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -134,6 +151,8 @@ export default function StudentProfile() {
     e.preventDefault();
     if (!validateForm()) return;
     setIsSubmitting(true);
+    setSuccessMessage("");
+    setErrorMessage("");
     try {
       const formData = new FormData();
       formData.append("userId", user.id);
@@ -147,12 +166,17 @@ export default function StudentProfile() {
         body: formData,
       });
 
-      if (!response.ok) throw new Error("Update failed");
-      setSuccessMessage("Profile updated successfully!");
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Profile update failed. Please try again.");
+      }
+
+      setSuccessMessage("✅ Profile updated successfully!");
       setHasData(true);
       setIsEditing(false);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
-      setErrorMessage(err.message);
+      setErrorMessage("❌ " + err.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -180,7 +204,6 @@ export default function StudentProfile() {
 
         <form className={`profile-form ${!isEditing ? 'readonly-mode' : ''}`} onSubmit={handleSubmit}>
           
-          {/* PERSONAL INFO */}
           <div className="form-section-title">
             <Icon path={ICONS.user} className="section-icon" /> Personal Information
           </div>
@@ -212,7 +235,6 @@ export default function StudentProfile() {
 
           <div className="form-divider"></div>
 
-          {/* ACADEMIC DETAILS */}
           <div className="form-section-title">
             <Icon path={ICONS.academic} className="section-icon" /> Academic Details
           </div>
@@ -249,7 +271,6 @@ export default function StudentProfile() {
 
           <div className="form-divider"></div>
 
-          {/* CONTACT & PARENTS */}
           <div className="form-section-title">
             <Icon path={ICONS.contact} className="section-icon" /> Contact & Parent Info
           </div>
@@ -292,58 +313,39 @@ export default function StudentProfile() {
 
           <div className="form-divider"></div>
 
-          {/* HOSTEL DETAILS - (NOW FULLY CONTROLLED BY ADMIN/DB) */}
           <div className="form-section-title">
-            <Icon path={ICONS.family} className="section-icon" /> Hostel & Fee Status
+            <Icon path={ICONS.family} className="section-icon" /> Fees Payment Status
           </div>
-          <div className="form-grid">
-            <div className="form-group">
-              <label>Floor</label>
-              <input 
-                type="text" 
-                value={form.floor || "Not Allocated"} 
-                readOnly 
-                disabled 
-                style={{ backgroundColor: "#f9fafb", cursor: "not-allowed", fontWeight: "bold", color: "#4f46e5" }} 
-              />
-            </div>
-            <div className="form-group">
-              <label>Room Number</label>
-              <input 
-                type="text" 
-                value={form.roomNo || "Not Allocated"} 
-                readOnly 
-                disabled 
-                style={{ backgroundColor: "#f9fafb", cursor: "not-allowed", fontWeight: "bold", color: "#4f46e5" }} 
-              />
-            </div>
-            
-            {/* 🔥 FEE MODE DISABLED FOR STUDENTS - ADMIN ONLY 🔥 */}
-            <div className="form-group">
-              <label>Fee Payment Mode</label>
-              <input 
-                type="text" 
-                name="feeMode"
-                value={form.feeMode || "Pending / Not Updated"} 
-                readOnly 
-                disabled 
-                style={{ 
-                  backgroundColor: "#fef2f2", 
-                  cursor: "not-allowed", 
-                  fontWeight: "bold", 
-                  color: form.feeMode ? "#059669" : "#dc2626", 
-                  border: "1px solid #fee2e2"
-                }} 
-              />
-              <small style={{ color: "#6b7280", marginTop: "4px", display: "block" }}>
-                * Controlled by Admin / Payment Module
-              </small>
+          <div className="form-group">
+            <label style={{ display: "block", marginBottom: "8px", fontWeight: "bold" }}>Have you paid your hostel fees? *</label>
+            <div style={{ display: "flex", gap: "20px", marginTop: "8px" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: isEditing ? "pointer" : "not-allowed" }}>
+                <input 
+                  type="radio" 
+                  name="feeMode" 
+                  value="Paid" 
+                  checked={form.feeMode === "Paid"} 
+                  onChange={onChange} 
+                  disabled={!isEditing} 
+                />
+                Paid
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: isEditing ? "pointer" : "not-allowed" }}>
+                <input 
+                  type="radio" 
+                  name="feeMode" 
+                  value="Unpaid" 
+                  checked={form.feeMode === "Unpaid" || !form.feeMode} 
+                  onChange={onChange} 
+                  disabled={!isEditing} 
+                />
+                Unpaid
+              </label>
             </div>
           </div>
 
           <div className="form-divider"></div>
 
-          {/* UPLOADS */}
           <div className="form-section-title">
             <Icon path={ICONS.image} className="section-icon" /> Documents Upload
           </div>
@@ -364,14 +366,14 @@ export default function StudentProfile() {
             </div>
             <div className="upload-card">
               <label>Fees Receipt *</label>
-              <div className={`upload-area ${!isEditing ? 'disabled' : ''}`}>
+              <div className={`upload-area ${!isEditing || form.feeMode !== 'Paid' ? 'disabled' : ''}`}>
                 {feesPreview ? <img src={feesPreview} alt="F" className="img-preview" /> : <div className="placeholder"><Icon path={ICONS.image} /></div>}
-                {isEditing && <input type="file" onChange={handleFileChange(setFeesReceipt, setFeesPreview)} accept="image/*,application/pdf" className="file-input" />}
+                {isEditing && form.feeMode === 'Paid' && <input type="file" onChange={handleFileChange(setFeesReceipt, setFeesPreview)} accept="image/*,application/pdf" className="file-input" />}
               </div>
+              {errors.feesReceipt && <span style={{ color: "red", fontSize: "0.8rem", marginTop: "4px", display: "block" }}>{errors.feesReceipt}</span>}
             </div>
           </div>
 
-          {/* Submit/Cancel Buttons */}
           {isEditing && (
             <div style={{ display: 'flex', gap: '12px', marginTop: '2rem' }}>
               <button type="submit" className="submit-btn" disabled={isSubmitting}>

@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { supabase } from "../../utils/supabase";
+import { API_BASE_URL } from "../../config";
 import "../../styles/RoomRequests.css";
 
-// Simple Icon Component for consistency
 const Icon = ({ path, className = "icon" }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={className}>
     <path fillRule="evenodd" d={path} clipRule="evenodd" />
@@ -23,18 +22,16 @@ export default function RoomRequests({ onActionComplete }) {
 
   const fetchRequests = async () => {
     setLoading(true);
-    let query = supabase
-      .from("allocations")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (filter !== "all") {
-      query = query.eq("status", filter);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/allocation/requests?status=${filter}`);
+      if (!res.ok) throw new Error("Failed to fetch requests");
+      const data = await res.json();
+      setRequests(data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
-
-    const { data, error } = await query;
-    if (!error) setRequests(data || []);
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -45,26 +42,18 @@ export default function RoomRequests({ onActionComplete }) {
     try {
       if (!window.confirm(`Are you sure you want to mark this as ${status}?`)) return;
 
-      const { error: updateError } = await supabase
-        .from("allocations")
-        .update({ status })
-        .eq("id", id);
+      const res = await fetch(`${API_BASE_URL}/api/allocation/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, regNo })
+      });
 
-      if (updateError) throw updateError;
-
-      const canApplyValue = status === "confirmed" ? false : true;
-      
-      const { error: studentError } = await supabase
-        .from("student_profiles")
-        .update({ can_apply: canApplyValue })
-        .eq("roll_no", regNo);
-
-      if (studentError) console.error("Error updating student profile:", studentError);
+      if (!res.ok) throw new Error("Failed to update status");
 
       fetchRequests();
       if (onActionComplete) onActionComplete();
     } catch (err) {
-      console.error("Error updating status:", err);
+      console.error(err);
       alert("Failed to update status");
     }
   };
@@ -125,7 +114,6 @@ export default function RoomRequests({ onActionComplete }) {
                     </div>
                   </td>
                   
-                  {/* Payment Column - Optimized UI */}
                   <td className="payment-cell">
                     {r.receipt_url && r.receipt_url.startsWith('http') ? (
                       <a href={r.receipt_url} target="_blank" rel="noreferrer" className="receipt-link-btn">

@@ -1,7 +1,5 @@
-// src/components/Navbar.jsx
 import React, { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { supabase } from "../../utils/supabase";
 import { useAuth } from "../../context/AuthContext";
 import "../../styles/Navbar.css"; 
 
@@ -11,11 +9,11 @@ const LogoutIcon = () => (
 
 export default function Navbar() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
+  const handleLogout = () => {
+    logout();
     navigate("/login");
     setIsMenuOpen(false);
   };
@@ -27,10 +25,9 @@ export default function Navbar() {
     <nav className="navbar">
       <div className="navbar-container">
         
-        {/* ✅ Brand Name Updated to CubeAI Hostels */}
         <div className="navbar-brand" onClick={() => navigate("/student")}>
           <div className="brand-text">
-            <h1>CubeAI Hostels</h1>
+            <h1>Kongu Hostels</h1>
             <span>Student Portal</span>
           </div>
         </div>
@@ -43,20 +40,13 @@ export default function Navbar() {
 
         <div className={`navbar-menu ${isMenuOpen ? "active" : ""}`}>
           <ul className="nav-links">
-            {/* ✅ Dashboard (Home) */}
             <li><NavLink to="/student" end onClick={closeMenu}>Dashboard</NavLink></li>
-            {/* ✅ Profile */}
-            <li><NavLink to="/StudentProfile" onClick={closeMenu}>Profile</NavLink></li>
-            {/* ✅ Room Allocation */}
-            <li><NavLink to="/room-allocation" onClick={closeMenu}>Rooms</NavLink></li>
-            {/* ✅ Leave */}
-            <li><NavLink to="/LeaveAppliction" onClick={closeMenu}>Leave</NavLink></li>
-            {/* ✅ Feedback */}
-            <li><NavLink to="/Feedback" onClick={closeMenu}>Feedback</NavLink></li>
-            {/* ✅ Food */}
-            <li><NavLink to="/Schedule" onClick={closeMenu}>Food</NavLink></li>
-            {/* ✅ Rules */}
-            <li><NavLink to="/Rules" onClick={closeMenu}>Rules </NavLink></li>
+            <li><NavLink to="/student/profile" onClick={closeMenu}>Profile</NavLink></li>
+            <li><NavLink to="/student/room-allocation" onClick={closeMenu}>Rooms</NavLink></li>
+            <li><NavLink to="/student/leave-application" onClick={closeMenu}>Leave</NavLink></li>
+            <li><NavLink to="/student/feedback" onClick={closeMenu}>Feedback</NavLink></li>
+            <li><NavLink to="/student/schedule" onClick={closeMenu}>Food</NavLink></li>
+            <li><NavLink to="/student/rules" onClick={closeMenu}>Rules </NavLink></li>
           </ul>
           <div className="nav-user-actions">
             <span className="user-email">{user?.email}</span>

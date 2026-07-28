@@ -1,13 +1,11 @@
 const express = require("express");
 const router = express.Router();
-const supabase = require("../utils/supabaseClient");
+const db = require("../utils/db");
 const multer = require("multer");
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
-// @route   POST /api/leave
-// @desc    Submit a new leave application with signature
 router.post("/", upload.single("studentSignature"), async (req, res) => {
   const {
     name, rollNumber, branch, year, semester,
@@ -19,89 +17,66 @@ router.post("/", upload.single("studentSignature"), async (req, res) => {
   try {
     let signatureUrl = null;
     if (req.file) {
-      const fileName = `signatures/${Date.now()}_${rollNumber}`;
-      const { error: uploadError } = await supabase.storage
-        .from("leave-signatures")
-        .upload(fileName, req.file.buffer, { 
-            contentType: req.file.mimetype,
-            upsert: true 
-        });
-
-      if (uploadError) throw uploadError;
-
-      const { data: publicUrlData } = supabase.storage
-        .from("leave-signatures")
-        .getPublicUrl(fileName);
-
-      signatureUrl = publicUrlData.publicUrl;
+      signatureUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
     }
 
-    const { data, error } = await supabase.from("leave_applications").insert([{
-      email,
-      user_id: userId,
-      name,
-      roll_number: rollNumber,
-      branch,
-      year,
-      semester,
-      hostel_name: hostelName,
-      room_number: roomNumber,
-      date_of_stay: date,
-      time,
-      reason,
-      student_mobile: studentMobile,
-      parent_mobile: parentMobile,
-      informed_advisor: informedAdvisor,
-      advisor_name: advisorName || null,
-      advisor_mobile: advisorMobile || null,
-      student_signature_url: signatureUrl,
-      status: "pending"
-    }]).select();
-
-    if (error) throw error;
-    res.status(201).json({ message: "Success", leave: data[0] });
-
-  } catch (err) {
-    console.error("Leave Post Error:", err.message);
-    res.status(500).json({ error: "Failed to submit application" });
-  }
-});
-
-// @route   GET /api/leave
-// @desc    Admin: Fetch all applications | Student: Fetch by email query
-router.get("/", async (req, res) => {
-  const { email } = req.query;
-  try {
-    let query = supabase.from("leave_applications").select("*").order("created_at", { ascending: false });
-    
-    if (email) query = query.eq("email", email);
-
-    const { data, error } = await query;
-    if (error) throw error;
-    res.status(200).json(data);
+    const result = await db.query(
+      `INSERT INTO public.leave_applications (
+        email, user_id, name, roll_number, branch, year, semester, hostel_name, 
+        room_number, date_of_stay, time, reason, student_mobile, parent_mobile, 
+        informed_advisor, advisor_name, advisor_mobile, student_signature_url, status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, 'pending') RETURNING *`,
+      [
+        email, userId, name, rollNumber, branch, year, semester, hostelName,
+        roomNumber, date, time, reason, studentMobile, parentMobile,
+        informedAdvisor, advisorName || null, advisorMobile || null, signatureUrl
+      ]
+    );
+    res.status(201).json({ message: "Success", leave: result.rows[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// @route   PATCH /api/leave/:id
-// @desc    Update status (Approve/Reject)
+router.post("/upload-signature", upload.single("signature"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+    const publicUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+    res.json({ publicUrl });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get("/", async (req, res) => {
+  const { email } = req.query;
+  try {
+    let result;
+    if (email) {
+      result = await db.query(
+        "SELECT * FROM public.leave_applications WHERE email = $1 ORDER BY created_at DESC",
+        [email]
+      );
+    } else {
+      result = await db.query("SELECT * FROM public.leave_applications ORDER BY created_at DESC");
+    }
+    res.status(200).json(result.rows || []);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.patch("/:id", async (req, res) => {
   const { id } = req.params;
   const { status, admin_signature_url } = req.body;
-
   try {
-    const { data, error } = await supabase
-      .from("leave_applications")
-      .update({ 
-        status: status, 
-        admin_signature_url: admin_signature_url 
-      })
-      .eq("id", id)
-      .select();
-
-    if (error) throw error;
-    res.status(200).json(data[0]);
+    const result = await db.query(
+      "UPDATE public.leave_applications SET status = $1, admin_signature_url = $2 WHERE id = $3 RETURNING *",
+      [status, admin_signature_url, id]
+    );
+    res.status(200).json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

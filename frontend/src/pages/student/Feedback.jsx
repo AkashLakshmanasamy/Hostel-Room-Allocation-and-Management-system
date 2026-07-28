@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useAuth } from "../../context/AuthContext";
 import { API_BASE_URL } from "../../config";
-import "../../styles/Feedback.css"; // ✅ Your CSS file
+import "../../styles/Feedback.css";
 
-// --- Icons ---
 const Icon = ({ path, className = "" }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -20,6 +20,8 @@ const ICONS = {
 };
 
 export default function Feedback() {
+  const { user, loading: authLoading } = useAuth();
+  
   const [formData, setFormData] = useState({
     name: "",
     roll_no: "",
@@ -30,9 +32,46 @@ export default function Feedback() {
     urgency: "medium",
   });
 
+  const [isProfileVerified, setIsProfileVerified] = useState(null);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (authLoading || !user) return;
+
+    const fetchProfileAndVerify = async () => {
+      try {
+        const [profileRes, statusRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/student/profile/${user.id}`),
+          fetch(`${API_BASE_URL}/api/allocation/status?email=${user.email}`)
+        ]);
+
+        if (profileRes.ok) {
+          const profileData = await profileRes.json();
+          if (profileData && profileData.name && profileData.roll_no) {
+            setIsProfileVerified(true);
+            const statusData = await statusRes.json();
+            
+            setFormData(prev => ({
+              ...prev,
+              name: profileData.name || "",
+              roll_no: profileData.roll_no || "",
+              department: profileData.department || "",
+              room_no: statusData?.allocation?.room_number || profileData.room_no || "",
+            }));
+          } else {
+            setIsProfileVerified(false);
+          }
+        } else {
+          setIsProfileVerified(false);
+        }
+      } catch (err) {
+        setIsProfileVerified(false);
+      }
+    };
+    fetchProfileAndVerify();
+  }, [user, authLoading]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -53,19 +92,15 @@ export default function Feedback() {
       });
 
       const result = await res.json();
-
       if (!res.ok) throw new Error(result.error || "Failed to submit feedback");
 
       setSubmitted(true);
-      setFormData({
-        name: "",
-        roll_no: "",
-        department: "",
-        room_no: "",
-        feedback_type: "feedback",
+      setFormData(prev => ({
+        ...prev,
         message: "",
         urgency: "medium",
-      });
+        feedback_type: "feedback"
+      }));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -74,6 +109,27 @@ export default function Feedback() {
   };
 
   const resetForm = () => setSubmitted(false);
+
+  if (authLoading || isProfileVerified === null) {
+    return <div className="feedback-page"><div className="feedback-card">Loading...</div></div>;
+  }
+
+  if (isProfileVerified === false) {
+    return (
+      <div className="feedback-page">
+        <div className="feedback-card" style={{ textAlign: 'center', padding: '50px' }}>
+          <div style={{ fontSize: '3.5rem', marginBottom: '20px' }}>📋</div>
+          <h2 style={{ color: '#ef4444', marginBottom: '10px' }}>Profile Verification Required</h2>
+          <p style={{ color: '#6b7280', fontSize: '1.1rem', lineHeight: '1.6', maxWidth: '500px', margin: '0 auto 25px' }}>
+            Please complete your student profile details first to submit feedback.
+          </p>
+          <a href="/student/profile" className="submit-btn" style={{ textDecoration: 'none', display: 'inline-block', width: 'auto', padding: '12px 30px' }}>
+            Complete Profile
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   if (submitted) {
     return (
@@ -101,30 +157,28 @@ export default function Feedback() {
         </div>
 
         <form className="feedback-form" onSubmit={handleSubmit}>
-          {/* Personal Details */}
           <div className="form-section-label">Personal Details</div>
           <div className="form-grid">
             <div className="form-group">
               <label htmlFor="name">Name</label>
-              <input type="text" id="name" name="name" value={formData.name} onChange={handleChange} required placeholder="Enter your full name" />
+              <input type="text" id="name" name="name" value={formData.name} readOnly disabled className="disabled-input" />
             </div>
             <div className="form-group">
               <label htmlFor="roll_no">Roll Number</label>
-              <input type="text" id="roll_no" name="roll_no" value={formData.roll_no} onChange={handleChange} required placeholder="e.g., 21CSR001" />
+              <input type="text" id="roll_no" name="roll_no" value={formData.roll_no} readOnly disabled className="disabled-input" />
             </div>
             <div className="form-group">
               <label htmlFor="department">Department</label>
-              <input type="text" id="department" name="department" value={formData.department} onChange={handleChange} required placeholder="e.g., CSE" />
+              <input type="text" id="department" name="department" value={formData.department} readOnly disabled className="disabled-input" />
             </div>
             <div className="form-group">
-              <label htmlFor="room_no">Room Number (Optional)</label>
-              <input type="text" id="room_no" name="room_no" value={formData.room_no} onChange={handleChange} placeholder="e.g., 101" />
+              <label htmlFor="room_no">Room Number</label>
+              <input type="text" id="room_no" name="room_no" value={formData.room_no || "Not Allocated"} readOnly disabled className="disabled-input" />
             </div>
           </div>
 
           <hr className="form-divider" />
 
-          {/* Feedback Details */}
           <div className="form-section-label">Feedback Details</div>
           <div className="form-grid">
             <div className="form-group">
@@ -159,7 +213,7 @@ export default function Feedback() {
           {error && <div className="error-message">{error}</div>}
 
           <button type="submit" className="submit-btn" disabled={loading}>
-            {loading ? <> <span className="spinner"></span> Submitting... </> : <> Submit Feedback <Icon path={ICONS.send} /> </>}
+            {loading ? "Submitting..." : "Submit Feedback"}
           </button>
         </form>
       </div>

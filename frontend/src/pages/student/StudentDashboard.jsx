@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../../utils/supabase";
 import { useAuth } from "../../context/AuthContext"; 
+import { API_BASE_URL } from "../../config";
 import "../../styles/StudentDashboard.css"; 
 
-// --- Icons (SVG Paths) ---
 const Icon = ({ path, className = "" }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -34,21 +33,25 @@ export default function StudentDashboard() {
     const fetchData = async () => {
       setLoading(true);
       if (user) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("full_name")
-          .eq("id", user.id)
-          .single();
-        if (profile?.full_name) setStudentName(profile.full_name);
+        try {
+          const profileRes = await fetch(`${API_BASE_URL}/api/student/profile/${user.id}`);
+          if (profileRes.ok) {
+            const profileData = await profileRes.json();
+            if (profileData?.name) setStudentName(profileData.name);
+          }
+        } catch (e) {
+          console.error(e);
+        }
       }
-
-      const { data: notices } = await supabase
-        .from("announcements")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(5);
-      
-      if (notices) setAnnouncements(notices);
+      try {
+        const noticesRes = await fetch(`${API_BASE_URL}/api/announcements`);
+        if (noticesRes.ok) {
+          const notices = await noticesRes.json();
+          setAnnouncements(notices.slice(0, 5));
+        }
+      } catch (e) {
+        console.error(e);
+      }
       setLoading(false);
     };
     fetchData();
@@ -63,27 +66,25 @@ export default function StudentDashboard() {
 
   return (
     <div className="dashboard-container">
-      {/* 1. Welcome Banner - CHANGED TO CubeAI Hostel */}
       <header className="home-header">
         <div className="header-content">
-          <div className="hostel-badge">CubeAI Hostel Portal</div>
+          <div className="hostel-badge">Kongu Hostel Portal</div>
           <h1>Welcome back, <span className="highlight">{displayName}</span>!</h1>
-          <p>Managed by CubeAI Systems. Everything looks good today.</p>
+          <p>Managed by Kongu Systems. Everything looks good today.</p>
         </div>
       </header>
 
-      {/* 2. Quick Status Cards */}
       <div className="status-grid">
-        <div className="status-card highlight-card" onClick={() => navigate("/room-allocation")}>
+        <div className="status-card highlight-card" onClick={() => navigate("/student/room-allocation")}>
           <div className="card-icon-bg"><Icon path={ICONS.bed} /></div>
           <div className="card-info">
             <h3>Room Allocation</h3>
-            <p>CubeAI Bed Booking</p>
+            <p>Kongu Bed Booking</p>
             <span className="action-link">Book Now <Icon path={ICONS.arrow} /></span>
           </div>
         </div>
 
-        <div className="status-card" onClick={() => navigate("/schedule")}>
+        <div className="status-card" onClick={() => navigate("/student/schedule")}>
           <div className="card-icon-bg secondary"><Icon path={ICONS.food} /></div>
           <div className="card-info">
             <h3>Mess Menu</h3>
@@ -92,20 +93,19 @@ export default function StudentDashboard() {
           </div>
         </div>
 
-        <div className="status-card" onClick={() => navigate("/rules")}>
+        <div className="status-card" onClick={() => navigate("/student/rules")}>
           <div className="card-icon-bg warning"><Icon path={ICONS.alert} /></div>
           <div className="card-info">
-            <h3>CubeAI Rules</h3>
+            <h3>Kongu Rules</h3>
             <p>Guidelines & Notices</p>
             <span className="action-link">Read Rules <Icon path={ICONS.arrow} /></span>
           </div>
         </div>
       </div>
 
-      {/* 3. Notice Board Section */}
       <div className="dashboard-section">
         <div className="section-header">
-            <h2>📢 CubeAI Announcements</h2>
+            <h2>📢 Kongu Announcements</h2>
             <button className="view-all-btn">View All</button>
         </div>
 
@@ -113,7 +113,7 @@ export default function StudentDashboard() {
           {loading ? (
              <div className="skeleton-loader">Fetching updates...</div>
           ) : announcements.length === 0 ? (
-             <div className="empty-notices">No new updates from CubeAI management.</div>
+             <div className="empty-notices">No new updates from Kongu management.</div>
           ) : (
             announcements.map((notice) => (
               <div key={notice.id} className="notice-card-modern">
@@ -126,7 +126,7 @@ export default function StudentDashboard() {
 
                 <div className="notice-main-content">
                   <div className="notice-header-row">
-                    <span className="notice-badge">CubeAI Update</span>
+                    <span className="notice-badge">Kongu Update</span>
                     <span className="notice-timestamp">{formatDate(notice.created_at)}</span>
                   </div>
                   <strong>{notice.title}</strong>

@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { supabase } from "../../utils/supabase"; // Adjust path to your supabase client
-import "../../styles/StudentRecords.css"; // We will create this next
+import { API_BASE_URL } from "../../config";
+import "../../styles/StudentRecords.css"; 
 
-// --- Simple Icon Component ---
 const Icon = ({ path, className = "" }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={`icon ${className}`}>
     <path fillRule="evenodd" d={path} clipRule="evenodd" />
@@ -21,7 +20,7 @@ export default function StudentRecords() {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedStudent, setSelectedStudent] = useState(null); // Controls Modal
+  const [selectedStudent, setSelectedStudent] = useState(null); 
 
   useEffect(() => {
     fetchStudents();
@@ -30,15 +29,12 @@ export default function StudentRecords() {
   const fetchStudents = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("student_profiles")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
+      const res = await fetch(`${API_BASE_URL}/api/student`);
+      if (!res.ok) throw new Error("Failed to fetch students");
+      const data = await res.json();
       setStudents(data || []);
     } catch (error) {
-      console.error("Error fetching students:", error.message);
+      console.error(error.message);
     } finally {
       setLoading(false);
     }
@@ -47,8 +43,10 @@ export default function StudentRecords() {
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this record? This cannot be undone.")) return;
     try {
-      const { error } = await supabase.from("student_profiles").delete().eq("id", id);
-      if (error) throw error;
+      const res = await fetch(`${API_BASE_URL}/api/student/${id}`, {
+        method: "DELETE"
+      });
+      if (!res.ok) throw new Error("Failed to delete");
       setStudents(students.filter(s => s.id !== id));
       if (selectedStudent?.id === id) setSelectedStudent(null);
     } catch (err) {
@@ -64,7 +62,6 @@ export default function StudentRecords() {
 
   return (
     <div className="records-page">
-      {/* Header Section */}
       <div className="records-header">
         <div>
           <h2>Student Records</h2>
@@ -81,7 +78,6 @@ export default function StudentRecords() {
         </div>
       </div>
 
-      {/* Table Section */}
       <div className="table-wrapper">
         <table className="data-table">
           <thead>
@@ -140,7 +136,6 @@ export default function StudentRecords() {
         </table>
       </div>
 
-      {/* --- Detail Modal --- */}
       {selectedStudent && (
         <div className="modal-overlay" onClick={() => setSelectedStudent(null)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
@@ -152,7 +147,6 @@ export default function StudentRecords() {
             </div>
             
             <div className="modal-body">
-              {/* Top Row: Photo + Main Info */}
               <div className="modal-top">
                 <div className="modal-img-wrapper">
                   <img src={selectedStudent.passport_photo_url} alt="Student" />
@@ -170,9 +164,7 @@ export default function StudentRecords() {
 
               <div className="divider"></div>
 
-              {/* Information Grid */}
               <div className="info-grid-container">
-                {/* Col 1: Personal & Hostel */}
                 <div className="info-column">
                   <h4>Personal & Hostel</h4>
                   <InfoRow label="DOB" value={selectedStudent.dob} />
@@ -183,7 +175,6 @@ export default function StudentRecords() {
                   <InfoRow label="Fee Mode" value={selectedStudent.fee_mode} />
                 </div>
 
-                {/* Col 2: Parents & Address */}
                 <div className="info-column">
                   <h4>Parent & Address</h4>
                   <InfoRow label="Father" value={selectedStudent.father_name} />
@@ -197,7 +188,6 @@ export default function StudentRecords() {
 
               <div className="divider"></div>
 
-              {/* Documents Section */}
               <h4>Uploaded Documents</h4>
               <div className="docs-row">
                 <DocCard label="Passport Photo" url={selectedStudent.passport_photo_url} />
@@ -213,7 +203,6 @@ export default function StudentRecords() {
   );
 }
 
-// Helpers
 const InfoRow = ({ label, value }) => (
   <div className="info-row">
     <span className="label">{label}:</span> <span className="value">{value || "-"}</span>

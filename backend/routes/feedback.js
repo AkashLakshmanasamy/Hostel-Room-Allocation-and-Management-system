@@ -1,61 +1,67 @@
 const express = require("express");
 const router = express.Router();
-const supabase = require("../utils/supabaseClient");
+const db = require("../utils/db");
 
-// GET all feedbacks (Admin side)
 router.get("/", async (req, res) => {
-    const { status, urgency } = req.query;
-    try {
-        let query = supabase.from("feedbacks").select("*").order("created_at", { ascending: false });
+  const { status, urgency } = req.query;
+  try {
+    let query = "SELECT * FROM public.feedbacks";
+    let params = [];
+    let conditions = [];
 
-        if (status && status !== "all") query = query.eq("status", status);
-        if (urgency && urgency !== "all") query = query.eq("urgency", urgency);
-
-        const { data, error } = await query;
-        if (error) throw error;
-        res.json(data);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+    if (status && status !== "all") {
+      params.push(status);
+      conditions.push(`status = $${params.length}`);
     }
+    if (urgency && urgency !== "all") {
+      params.push(urgency);
+      conditions.push(`urgency = $${params.length}`);
+    }
+
+    if (conditions.length > 0) {
+      query += " WHERE " + conditions.join(" AND ");
+    }
+    query += " ORDER BY created_at DESC";
+
+    const result = await db.query(query, params);
+    res.json(result.rows || []);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// POST new feedback (Student side)
 router.post("/", async (req, res) => {
-    const { name, roll_no, department, room_no, feedback_type, message, urgency } = req.body;
-    try {
-        const { data, error } = await supabase.from("feedbacks").insert([{
-            name, roll_no, department, room_no, feedback_type, message, urgency, status: "pending"
-        }]);
-        if (error) throw error;
-        res.status(201).json({ message: "Feedback submitted successfully" });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+  const { name, roll_no, department, room_no, feedback_type, message, urgency } = req.body;
+  try {
+    await db.query(
+      "INSERT INTO public.feedbacks (name, roll_no, department, room_no, feedback_type, message, urgency, status) VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')",
+      [name, roll_no, department, room_no, feedback_type, message, urgency]
+    );
+    res.status(201).json({ message: "Feedback submitted successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// PATCH status (Admin Resolve/Unresolve)
 router.patch("/:id/status", async (req, res) => {
-    const { id } = req.params;
-    const { status } = req.body;
-    try {
-        const { error } = await supabase.from("feedbacks").update({ status }).eq("id", id);
-        if (error) throw error;
-        res.json({ message: "Status updated" });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+  const { id } = req.params;
+  const { status } = req.body;
+  try {
+    await db.query("UPDATE public.feedbacks SET status = $1 WHERE id = $2", [status, id]);
+    res.json({ message: "Status updated" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// DELETE feedback
 router.delete("/:id", async (req, res) => {
-    const { id } = req.params;
-    try {
-        const { error } = await supabase.from("feedbacks").delete().eq("id", id);
-        if (error) throw error;
-        res.json({ message: "Deleted" });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+  const { id } = req.params;
+  try {
+    await db.query("DELETE FROM public.feedbacks WHERE id = $1", [id]);
+    res.json({ message: "Deleted" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

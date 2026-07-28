@@ -1,19 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const supabase = require("../utils/supabaseClient");
+const db = require("../utils/db");
 
-// GET: Fetch rules
 router.get('/', async (req, res) => {
     try {
-        const { data, error } = await supabase
-            .from("hostel_rules")
-            .select("*")
-            .eq("id", 1)
-            .maybeSingle();
-
-        if (error) throw error;
-
-        // Default structure if DB is empty
+        const result = await db.query("SELECT * FROM public.hostel_rules WHERE id = 1 LIMIT 1");
         const defaults = {
             id: 1,
             general_rules: [],
@@ -22,27 +13,35 @@ router.get('/', async (req, res) => {
             prohibited_items: { electrical: [], restricted: [] },
             consequences: []
         };
-
-        res.json(data || defaults);
+        res.json(result.rows[0] || defaults);
     } catch (err) {
-        console.error("GET Error:", err.message);
         res.status(500).json({ error: err.message });
     }
 });
 
-// PUT: Update rules
 router.put('/', async (req, res) => {
     try {
-        console.log("Received update request:", req.body);
-        const { data, error } = await supabase
-            .from("hostel_rules")
-            .upsert({ id: 1, ...req.body }, { onConflict: 'id' })
-            .select();
-
-        if (error) throw error;
-        res.json({ message: "Success", data });
+        const { general_rules, mess_timings, gate_timings, prohibited_items, consequences } = req.body;
+        const queryStr = `
+            INSERT INTO public.hostel_rules (id, general_rules, mess_timings, gate_timings, prohibited_items, consequences)
+            VALUES (1, $1, $2, $3, $4, $5)
+            ON CONFLICT (id) DO UPDATE SET
+                general_rules = EXCLUDED.general_rules,
+                mess_timings = EXCLUDED.mess_timings,
+                gate_timings = EXCLUDED.gate_timings,
+                prohibited_items = EXCLUDED.prohibited_items,
+                consequences = EXCLUDED.consequences
+            RETURNING *
+        `;
+        const result = await db.query(queryStr, [
+            JSON.stringify(general_rules || []),
+            JSON.stringify(mess_timings || {}),
+            JSON.stringify(gate_timings || {}),
+            JSON.stringify(prohibited_items || {}),
+            JSON.stringify(consequences || [])
+        ]);
+        res.json({ message: "Success", data: result.rows[0] });
     } catch (err) {
-        console.error("PUT Error:", err.message);
         res.status(500).json({ error: err.message });
     }
 });

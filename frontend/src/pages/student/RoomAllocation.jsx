@@ -13,7 +13,6 @@ const API_BASE = `${API_BASE_URL}/api/allocation`;
 export default function StudentRoomAllocation() {
   const { user, loading } = useAuth();
 
-  // --- States ---
   const [form, setForm] = useState({
     email: "",
     name: "",
@@ -32,8 +31,6 @@ export default function StudentRoomAllocation() {
   const [occupiedBeds, setOccupiedBeds] = useState([]);
   const [config, setConfig] = useState(null);
   const [isSessionOpen, setIsSessionOpen] = useState(false);
-  
-  // 🔥 Eligibility State
   const [isEligible, setIsEligible] = useState(null); 
 
   const safeFetch = async (url, options = {}) => {
@@ -48,7 +45,6 @@ export default function StudentRoomAllocation() {
     } catch (err) { throw err; }
   };
 
-  // 1. FETCH CONFIG
   useEffect(() => {
     const fetchConfig = async () => {
       try {
@@ -67,23 +63,20 @@ export default function StudentRoomAllocation() {
         const closeTime = new Date(data.closeTime).getTime();
         const isOpen = currentTime >= openTime && currentTime <= closeTime;
         setIsSessionOpen(isOpen);
-
       } catch (e) { 
-        console.error("Config Fetch Error:", e);
+        console.error(e);
         setIsSessionOpen(false); 
       }
     };
     fetchConfig();
   }, [form.hostel]);
 
-  // 2. Room Generation
   const rooms = useMemo(() => {
     const count = parseInt(config?.roomsPerFloor) || 40;
     const start = form.floor === "Ground" ? 1 : form.floor === "First" ? 101 : form.floor === "Second" ? 201 : 301;
     return Array.from({ length: count }, (_, i) => form.floor === "Ground" ? String(i + 1).padStart(3, "0") : String(start + i));
   }, [form.floor, config]);
 
-  // 3. Fetch Occupied
   const fetchOccupied = useCallback(async () => {
     try {
       const { data } = await safeFetch(`${API_BASE}/occupied?hostel=${encodeURIComponent(form.hostel)}&floor=${form.floor}`);
@@ -93,7 +86,6 @@ export default function StudentRoomAllocation() {
 
   useEffect(() => { fetchOccupied(); }, [fetchOccupied]);
 
-  // 4. STATUS CHECK & ELIGIBILITY LOGIC
   useEffect(() => {
     if (!loading && user?.email) {
       const getProfileAndStatus = async () => {
@@ -104,12 +96,10 @@ export default function StudentRoomAllocation() {
             safeFetch(`${API_BASE}/status?email=${user.email}`)
           ]);
 
-          // Handle Profile Data & Check Eligibility
           if (profileRes.ok) {
             const profileData = await profileRes.json();
             
-            // Check if fee_mode exists in profile
-            if (profileData && profileData.fee_mode) {
+            if (profileData && profileData.fee_mode === "Paid") {
               setIsEligible(true);
               setForm(prev => ({
                 ...prev,
@@ -124,7 +114,6 @@ export default function StudentRoomAllocation() {
             }
           }
 
-          // Handle Existing Allocation
           const { data: statusData } = statusRes;
           if (statusData && statusData.allocation && 
               statusData.allocation.status !== "rejected" && 
@@ -133,9 +122,8 @@ export default function StudentRoomAllocation() {
           } else {
             setExistingAllocation(null);
           }
-
         } catch (err) { 
-          console.error("Fetch Error:", err.message);
+          console.error(err);
           setIsEligible(false);
           setForm(prev => ({ ...prev, email: user.email }));
         }
@@ -153,7 +141,6 @@ export default function StudentRoomAllocation() {
     return status;
   }, [occupiedBeds]);
 
-  // 5. SUBMIT LOGIC
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!receipt || !selected) return alert("Select a bed and upload receipt.");
@@ -181,11 +168,8 @@ export default function StudentRoomAllocation() {
     finally { setIsSubmitting(false); }
   };
 
-  // --- UI Rendering ---
-
   if (loadingStatus || loading) return <div className="allocation-page">Loading...</div>;
 
-  // Render Status if already allocated
   if (existingAllocation) {
     return (
       <div className="allocation-page">
@@ -204,7 +188,6 @@ export default function StudentRoomAllocation() {
     );
   }
 
-  // 🔥 Render Eligibility Error if Fees not updated in profile
   if (isEligible === false) {
     return (
       <div className="allocation-page">
@@ -212,7 +195,7 @@ export default function StudentRoomAllocation() {
           <div style={{ fontSize: '3.5rem', marginBottom: '20px' }}>⚠️</div>
           <h2 style={{ color: '#ef4444', marginBottom: '10px' }}>Fees Payment Status Required</h2>
           <p style={{ color: '#6b7280', fontSize: '1.1rem', lineHeight: '1.6', maxWidth: '500px', margin: '0 auto 25px' }}>
-            To proceed with room allocation, please update your <b>Fee Payment Mode</b> in the Profile section. You will be able to access this form once your profile is complete.
+            To proceed with room allocation, please update your Fee Payment Mode to Paid in your Profile. You will be able to access this page once you have updated your fee status.
           </p>
           <a href="/student/profile" className="submit-btn" style={{ textDecoration: 'none', display: 'inline-block', width: 'auto', padding: '12px 30px' }}>
             Go to Profile
@@ -222,7 +205,6 @@ export default function StudentRoomAllocation() {
     );
   }
 
-  // Render Allocation Form
   return (
     <div className="allocation-page">
       <div className="allocation-card">

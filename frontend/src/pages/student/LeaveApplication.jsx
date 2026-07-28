@@ -3,7 +3,6 @@ import { useAuth } from "../../context/AuthContext";
 import { API_BASE_URL as BASE_URL } from "../../config";
 import "../../styles/LeaveApplication.css";
 
-// --- Icons (Same as before) ---
 const Icon = ({ path, className = "" }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={`icon ${className}`}>
     <path fillRule="evenodd" d={path} clipRule="evenodd" />
@@ -24,7 +23,7 @@ const ICONS = {
 const API_BASE_URL = `${BASE_URL}/api/leave`;
 
 export default function LeaveApplication() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState("new");
   
   const [formData, setFormData] = useState({
@@ -34,12 +33,53 @@ export default function LeaveApplication() {
     advisorName: "", advisorMobile: "", studentSignature: null,
   });
 
+  const [isProfileVerified, setIsProfileVerified] = useState(null); 
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [historyData, setHistoryData] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [viewTicket, setViewTicket] = useState(null);
   const studentSignatureRef = useRef(null);
+
+  useEffect(() => {
+    if (authLoading || !user) return;
+    
+    const fetchProfileAndVerify = async () => {
+      try {
+        const [profileRes, statusRes] = await Promise.all([
+          fetch(`${BASE_URL}/api/student/profile/${user.id}`),
+          fetch(`${BASE_URL}/api/allocation/status?email=${user.email}`)
+        ]);
+        
+        if (profileRes.ok) {
+          const profileData = await profileRes.json();
+          if (profileData && profileData.name && profileData.roll_no) {
+            setIsProfileVerified(true);
+            const statusData = await statusRes.json();
+            
+            setFormData(prev => ({
+              ...prev,
+              name: profileData.name || "",
+              rollNumber: profileData.roll_no || "",
+              branch: profileData.department || "",
+              year: profileData.year ? `${profileData.year} Year` : "",
+              studentMobile: profileData.mobile || "",
+              parentMobile: profileData.father_contact || profileData.mother_contact || "",
+              hostelName: statusData?.allocation?.hostel || "",
+              roomNumber: statusData?.allocation?.room_number || "",
+            }));
+          } else {
+            setIsProfileVerified(false);
+          }
+        } else {
+          setIsProfileVerified(false);
+        }
+      } catch (err) {
+        setIsProfileVerified(false);
+      }
+    };
+    fetchProfileAndVerify();
+  }, [user, authLoading]);
 
   useEffect(() => {
     if (activeTab === 'history' && user?.email) {
@@ -91,35 +131,44 @@ export default function LeaveApplication() {
   const fetchHistory = async () => {
     setHistoryLoading(true);
     try {
-      // In your backend, the data might be returned directly as an array or inside a key
       const response = await fetch(`${API_BASE_URL}?email=${user.email}`);
       const result = await response.json();
-      
       if (!response.ok) throw new Error(result.error || "Fetch failed");
-      
-      // Handle both result.history or just result if it's a direct array
       const historyArray = Array.isArray(result) ? result : (result.history || []);
       setHistoryData(historyArray);
     } catch (err) {
-      console.error("History error:", err);
+      console.error(err);
     } finally {
       setHistoryLoading(false);
     }
   };
 
   const resetForm = () => {
-    setFormData({
-      name: "", rollNumber: "", branch: "", year: "", semester: "",
-      hostelName: "", roomNumber: "", date: "", time: "", reason: "",
-      studentMobile: "", parentMobile: "", informedAdvisor: "no",
-      advisorName: "", advisorMobile: "", studentSignature: null,
-    });
-    if (studentSignatureRef.current) studentSignatureRef.current.value = "";
     setSubmitted(false);
     setActiveTab("new");
   };
 
-  // --- Ticket View Modal ---
+  if (authLoading || isProfileVerified === null) {
+    return <div className="leave-page"><div className="leave-card">Loading...</div></div>;
+  }
+
+  if (isProfileVerified === false) {
+    return (
+      <div className="leave-page">
+        <div className="leave-card" style={{ textAlign: 'center', padding: '50px' }}>
+          <div style={{ fontSize: '3.5rem', marginBottom: '20px' }}>📋</div>
+          <h2 style={{ color: '#ef4444', marginBottom: '10px' }}>Profile Verification Required</h2>
+          <p style={{ color: '#6b7280', fontSize: '1.1rem', lineHeight: '1.6', maxWidth: '500px', margin: '0 auto 25px' }}>
+            Please complete your student profile details first to submit leave applications.
+          </p>
+          <a href="/student/profile" className="submit-btn" style={{ textDecoration: 'none', display: 'inline-block', width: 'auto', padding: '12px 30px' }}>
+            Complete Profile
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   if (viewTicket) {
     return (
       <div className="ticket-modal-backdrop">
@@ -137,15 +186,15 @@ export default function LeaveApplication() {
             </div>
             <div className="ticket-divider"></div>
             <div className="ticket-grid">
-              <div className="ticket-field"><label>Student Name</label><span>{viewTicket.name}</span></div>
-              <div className="ticket-field"><label>Roll Number</label><span>{viewTicket.roll_number}</span></div>
-              <div className="ticket-field"><label>Branch/Year</label><span>{viewTicket.branch} - {viewTicket.year} ({viewTicket.semester} Sem)</span></div>
+              <div><strong>Student Name:</strong> {viewTicket.name}</div>
+              <div><strong>Roll Number:</strong> {viewTicket.roll_number}</div>
+              <div><strong>Branch/Year:</strong> {viewTicket.branch} - {viewTicket.year} ({viewTicket.semester} Sem)</div>
             </div>
             <div className="ticket-divider"></div>
             <div className="ticket-grid">
-              <div className="ticket-field"><label>Hostel</label><span>{viewTicket.hostel_name} (Room {viewTicket.room_number})</span></div>
-              <div className="ticket-field"><label>Permitted Date</label><span>{viewTicket.date_of_stay}</span></div>
-              <div className="ticket-field"><label>Time</label><span>{viewTicket.time}</span></div>
+              <div><strong>Hostel:</strong> {viewTicket.hostel_name} (Room {viewTicket.room_number})</div>
+              <div><strong>Permitted Date:</strong> {viewTicket.date_of_stay}</div>
+              <div><strong>Time:</strong> {viewTicket.time}</div>
             </div>
             <div className="ticket-field full"><label>Reason</label><p>{viewTicket.reason}</p></div>
             
@@ -213,19 +262,10 @@ export default function LeaveApplication() {
                    <label>Linked Email</label>
                    <input type="email" value={user?.email || ""} disabled className="disabled-input" />
                 </div>
-                <div className="form-group"><label>Name *</label><input type="text" name="name" value={formData.name} onChange={handleChange} required /></div>
-                <div className="form-group"><label>Roll Number *</label><input type="text" name="rollNumber" value={formData.rollNumber} onChange={handleChange} required /></div>
-                <div className="form-group"><label>Branch *</label><input type="text" name="branch" value={formData.branch} onChange={handleChange} required /></div>
-                <div className="form-group">
-                  <label>Year *</label>
-                  <select name="year" value={formData.year} onChange={handleChange} required>
-                    <option value="">Select Year</option>
-                    <option value="1st">1st Year</option>
-                    <option value="2nd">2nd Year</option>
-                    <option value="3rd">3rd Year</option>
-                    <option value="4th">4th Year</option>
-                  </select>
-                </div>
+                <div className="form-group"><label>Name</label><input type="text" name="name" value={formData.name} readOnly disabled className="disabled-input" /></div>
+                <div className="form-group"><label>Roll Number</label><input type="text" name="rollNumber" value={formData.rollNumber} readOnly disabled className="disabled-input" /></div>
+                <div className="form-group"><label>Branch</label><input type="text" name="branch" value={formData.branch} readOnly disabled className="disabled-input" /></div>
+                <div className="form-group"><label>Year</label><input type="text" name="year" value={formData.year} readOnly disabled className="disabled-input" /></div>
                 <div className="form-group">
                   <label>Semester *</label>
                   <select name="semester" value={formData.semester} onChange={handleChange} required>
@@ -234,13 +274,10 @@ export default function LeaveApplication() {
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>Hostel Name *</label>
-                  <select name="hostelName" value={formData.hostelName} onChange={handleChange} required>
-                    <option value="">Select Hostel</option>
-                    {["Dheeran", "Ponnar", "Sankar", "Valluvar", "Bharathi"].map(h => <option key={h} value={h}>{h}</option>)}
-                  </select>
+                  <label>Hostel Name</label>
+                  <input type="text" name="hostelName" value={formData.hostelName || "Not Allocated"} readOnly disabled className="disabled-input" />
                 </div>
-                <div className="form-group"><label>Room Number *</label><input type="text" name="roomNumber" value={formData.roomNumber} onChange={handleChange} required /></div>
+                <div className="form-group"><label>Room Number</label><input type="text" name="roomNumber" value={formData.roomNumber || "Not Allocated"} readOnly disabled className="disabled-input" /></div>
               </div>
 
               <div className="form-divider"></div>
@@ -254,8 +291,8 @@ export default function LeaveApplication() {
               <div className="form-divider"></div>
               <div className="form-section-title"><Icon path={ICONS.phone} className="section-icon" /> Contact</div>
               <div className="form-grid">
-                <div className="form-group"><label>Student Mobile *</label><input type="tel" name="studentMobile" value={formData.studentMobile} onChange={handleChange} required /></div>
-                <div className="form-group"><label>Parent Mobile *</label><input type="tel" name="parentMobile" value={formData.parentMobile} onChange={handleChange} required /></div>
+                <div className="form-group"><label>Student Mobile</label><input type="tel" name="studentMobile" value={formData.studentMobile} readOnly disabled className="disabled-input" /></div>
+                <div className="form-group"><label>Parent Mobile</label><input type="tel" name="parentMobile" value={formData.parentMobile} readOnly disabled className="disabled-input" /></div>
               </div>
 
               <div className="form-divider"></div>

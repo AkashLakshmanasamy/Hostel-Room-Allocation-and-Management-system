@@ -1,78 +1,105 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const supabase = require('../utils/supabaseClient'); 
+const db = require('../utils/db'); 
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Matches: GET https://cas-cams-hostel-management-1.onrender.com/api/student/profile/:userId
-router.get('/profile/:userId', async (req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from('student_profiles')
-      .select('*')
-      .eq('user_id', req.params.userId)
-      .single();
-    
-    // PGRST116 means "no rows found", which is fine for a new profile
-    if (error && error.code !== 'PGRST116') throw error;
-    res.json(data || {}); 
+    const result = await db.query('SELECT * FROM public.student_profiles ORDER BY created_at DESC');
+    res.json(result.rows || []);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Matches: POST https://cas-cams-hostel-management-1.onrender.com/api/student/update
+router.delete('/:id', async (req, res) => {
+  try {
+    await db.query('DELETE FROM public.student_profiles WHERE id = $1', [req.params.id]);
+    res.json({ message: 'Profile deleted' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/profile/:userId', async (req, res) => {
+  try {
+    const result = await db.query('SELECT * FROM public.student_profiles WHERE user_id = $1', [req.params.userId]);
+    res.json(result.rows[0] || {}); 
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/update', upload.fields([
   { name: 'passportPhoto', maxCount: 1 },
   { name: 'idCardPhoto', maxCount: 1 },
   { name: 'feesReceipt', maxCount: 1 }
 ]), async (req, res) => {
   try {
-    const { userId, ...profile } = req.body;
+    const { userId, name, rollNo, dob, bloodGroup, department, year, section, admissionMode, mobile, whatsapp, fatherName, fatherContact, motherName, motherContact, address, district, floor, roomNo, feeMode } = req.body;
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
     const files = req.files;
-    let urls = {};
+    
+    let passportUrl = null;
+    let idCardUrl = null;
+    let feesReceiptUrl = null;
 
-    const uploadToSupabase = async (file, folder) => {
-      const fileName = `${userId}-${Date.now()}-${file.originalname}`;
-      const { data, error } = await supabase.storage
-        .from('student-files')
-        .upload(`${folder}/${fileName}`, file.buffer, { contentType: file.mimetype });
-      if (error) throw error;
-      return supabase.storage.from('student-files').getPublicUrl(`${folder}/${fileName}`).data.publicUrl;
-    };
+    if (files?.passportPhoto) {
+      passportUrl = `data:${files.passportPhoto[0].mimetype};base64,${files.passportPhoto[0].buffer.toString("base64")}`;
+    }
+    if (files?.idCardPhoto) {
+      idCardUrl = `data:${files.idCardPhoto[0].mimetype};base64,${files.idCardPhoto[0].buffer.toString("base64")}`;
+    }
+    if (files?.feesReceipt) {
+      feesReceiptUrl = `data:${files.feesReceipt[0].mimetype};base64,${files.feesReceipt[0].buffer.toString("base64")}`;
+    }
 
-    if (files.passportPhoto) urls.passport_photo_url = await uploadToSupabase(files.passportPhoto[0], 'passport');
-    if (files.idCardPhoto) urls.id_card_photo_url = await uploadToSupabase(files.idCardPhoto[0], 'id_card');
-    if (files.feesReceipt) urls.fees_receipt_url = await uploadToSupabase(files.feesReceipt[0], 'fees');
+    const queryStr = `
+      INSERT INTO public.student_profiles (
+        user_id, name, roll_no, dob, blood_group, department, year, section, 
+        admission_mode, mobile, whatsapp, father_name, father_contact, 
+        mother_name, mother_contact, address, district, floor, room_no, fee_mode,
+        passport_photo_url, id_card_photo_url, fees_receipt_url
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23
+      )
+      ON CONFLICT (user_id) DO UPDATE SET
+        name = EXCLUDED.name,
+        roll_no = EXCLUDED.roll_no,
+        dob = EXCLUDED.dob,
+        blood_group = EXCLUDED.blood_group,
+        department = EXCLUDED.department,
+        year = EXCLUDED.year,
+        section = EXCLUDED.section,
+        admission_mode = EXCLUDED.admission_mode,
+        mobile = EXCLUDED.mobile,
+        whatsapp = EXCLUDED.whatsapp,
+        father_name = EXCLUDED.father_name,
+        father_contact = EXCLUDED.father_contact,
+        mother_name = EXCLUDED.mother_name,
+        mother_contact = EXCLUDED.mother_contact,
+        address = EXCLUDED.address,
+        district = EXCLUDED.district,
+        floor = COALESCE(EXCLUDED.floor, student_profiles.floor),
+        room_no = COALESCE(EXCLUDED.room_no, student_profiles.room_no),
+        fee_mode = COALESCE(EXCLUDED.fee_mode, student_profiles.fee_mode),
+        passport_photo_url = COALESCE(EXCLUDED.passport_photo_url, student_profiles.passport_photo_url),
+        id_card_photo_url = COALESCE(EXCLUDED.id_card_photo_url, student_profiles.id_card_photo_url),
+        fees_receipt_url = COALESCE(EXCLUDED.fees_receipt_url, student_profiles.fees_receipt_url)
+    `;
 
-    const { error } = await supabase
-      .from('student_profiles')
-      .upsert({
-        user_id: userId,
-        name: profile.name,
-        roll_no: profile.rollNo,
-        dob: profile.dob,
-        blood_group: profile.bloodGroup,
-        department: profile.department,
-        year: profile.year,
-        section: profile.section,
-        admission_mode: profile.admissionMode,
-        mobile: profile.mobile,
-        whatsapp: profile.whatsapp,
-        father_name: profile.fatherName,
-        father_contact: profile.fatherContact,
-        mother_name: profile.motherName,
-        mother_contact: profile.motherContact,
-        address: profile.address,
-        district: profile.district,
-        floor: profile.floor,
-        room_no: profile.roomNo,
-        fee_mode: profile.feeMode,
-        ...urls
-      }, { onConflict: 'user_id' });
+    await db.query(queryStr, [
+      userId, name, rollNo, dob || null, bloodGroup, department, year, section,
+      admissionMode, mobile, whatsapp, fatherName, fatherContact,
+      motherName, motherContact, address, district, 
+      floor && !isNaN(parseInt(floor)) ? parseInt(floor) : null, roomNo || null, feeMode || null,
+      passportUrl, idCardUrl, feesReceiptUrl
+    ]);
 
-    if (error) throw error;
-    res.json({ success: true, message: "Profile Updated" });
+    res.json({ success: true, message: 'Profile Updated' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { supabase } from "../../utils/supabase";
-import "../../styles/AdminStyles.css"; // Ensure this points to your unified CSS
+import { API_BASE_URL } from "../../config";
+import "../../styles/AdminStyles.css"; 
 
-// Simple Icon Component for UI consistency
 const Icon = ({ path, className = "icon" }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={className}>
     <path fillRule="evenodd" d={path} clipRule="evenodd" />
@@ -19,47 +18,63 @@ export default function AdminAnnouncements() {
   const [form, setForm] = useState({ title: "", content: "" });
   const [loading, setLoading] = useState(false);
 
-  // Fetch existing announcements
   useEffect(() => {
     fetchAnnouncements();
   }, []);
 
   const fetchAnnouncements = async () => {
-    const { data } = await supabase
-      .from("announcements")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (data) setList(data);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/announcements`);
+      if (res.ok) {
+        const data = await res.json();
+        setList(data || []);
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
-  // Add new announcement
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
-    const { error } = await supabase.from("announcements").insert([form]);
-
-    if (!error) {
-      setForm({ title: "", content: "" });
-      fetchAnnouncements(); // Refresh list
-    } else {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/announcements`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form)
+      });
+      if (response.ok) {
+        setForm({ title: "", content: "" });
+        fetchAnnouncements();
+      } else {
+        alert("Error posting announcement");
+      }
+    } catch (err) {
       alert("Error posting announcement");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  // Delete announcement
   const handleDelete = async (id) => {
     const confirm = window.confirm("Are you sure you want to delete this?");
     if (!confirm) return;
 
-    const { error } = await supabase.from("announcements").delete().eq("id", id);
-    if (!error) fetchAnnouncements();
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/announcements/${id}`, {
+        method: "DELETE"
+      });
+      if (response.ok) {
+        fetchAnnouncements();
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   return (
     <div className="admin-page">
-      {/* Header */}
       <div className="page-header">
         <div>
           <h2>📢 Manage Announcements</h2>
@@ -68,7 +83,6 @@ export default function AdminAnnouncements() {
       </div>
 
       <div className="grid-2">
-        {/* Left Column: Form */}
         <div className="content-card">
           <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: '#111827' }}>Post New Update</h3>
           <form onSubmit={handleSubmit}>
@@ -103,7 +117,6 @@ export default function AdminAnnouncements() {
           </form>
         </div>
 
-        {/* Right Column: History List */}
         <div className="content-card">
           <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: '#111827' }}>History</h3>
           <div className="announcement-list">
