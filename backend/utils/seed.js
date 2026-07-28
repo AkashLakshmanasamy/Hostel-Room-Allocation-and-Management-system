@@ -58,9 +58,9 @@ const seed = async () => {
       restricted: ["Weapons", "Tobacco Products", "Alcoholic Beverages", "Flammable Liquids"]
     };
     const consequences = [
-      { infraction: "Late entry past curfew without prior permissions", penalty: "Written warning and parents notification" },
-      { infraction: "Possession or usage of prohibited electrical appliances", penalty: "Fine of Rs. 1000 and confiscation of appliance" },
-      { infraction: "Damage to hostel property or general vandalism", penalty: "Actual repair costs recovery and suspension" }
+      { violation: "Late entry past curfew without prior permissions", action: "Written warning and parents notification" },
+      { violation: "Possession or usage of prohibited electrical appliances", action: "Fine of Rs. 1000 and confiscation of appliance" },
+      { violation: "Damage to hostel property or general vandalism", action: "Actual repair costs recovery and suspension" }
     ];
 
     await db.query(
